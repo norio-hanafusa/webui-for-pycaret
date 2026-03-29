@@ -754,43 +754,64 @@ elif page == t("nav_results", lang):
         if st.button(t("btn_generate_plot", lang)):
             with st.spinner(t("msg_plot_generating", lang)):
                 try:
+                    import glob as _glob
+                    # Record existing png files before plotting
+                    _before = set(_glob.glob("*.png"))
+
+                    plot_key = plot_options[selected_plot]
                     if st.session_state.pycaret_task in ["clustering", "anomaly"]:
-                        fig_path = mod.plot_model(use_model, plot=plot_options[selected_plot], save=True)
+                        ret = mod.plot_model(use_model, plot=plot_key, save=True)
                     else:
-                        fig_path = mod.plot_model(use_model, plot=plot_options[selected_plot], save=True, verbose=False)
-                    # PyCaret may return a file path (str), a figure, or None
-                    if isinstance(fig_path, str) and os.path.exists(fig_path):
-                        st.image(fig_path)
-                    elif fig_path is not None and not isinstance(fig_path, str):
-                        # Could be a matplotlib figure or other object
+                        ret = mod.plot_model(use_model, plot=plot_key, save=True, verbose=False)
+
+                    # --- Determine how to display the result ---
+                    displayed = False
+
+                    # 1) Return value is a valid file path
+                    if isinstance(ret, str) and os.path.exists(ret):
+                        st.image(ret, use_container_width=True)
+                        displayed = True
+
+                    # 2) Return value is a string (filename without path check - PyCaret sometimes returns just name)
+                    if not displayed and isinstance(ret, str) and os.path.exists(os.path.basename(ret)):
+                        st.image(os.path.basename(ret), use_container_width=True)
+                        displayed = True
+
+                    # 3) Return value is a matplotlib figure
+                    if not displayed and ret is not None and not isinstance(ret, str):
                         try:
                             buf = io.BytesIO()
-                            fig_path.savefig(buf, format="png", bbox_inches="tight", dpi=120)
+                            ret.savefig(buf, format="png", bbox_inches="tight", dpi=120)
                             buf.seek(0)
-                            st.image(buf.getvalue())
-                        except AttributeError:
-                            # Not a figure object; try displaying directly
-                            st.pyplot(fig_path)
-                    else:
-                        # Fallback: look for recently created png files
-                        png_files = sorted(
-                            [f for f in os.listdir(".") if f.endswith(".png")],
-                            key=os.path.getmtime,
-                            reverse=True,
-                        )
-                        if png_files:
-                            st.image(png_files[0])
-                        else:
-                            # Last resort: try capturing current matplotlib figure
-                            cur_fig = plt.gcf()
-                            if cur_fig.get_axes():
-                                buf = io.BytesIO()
-                                cur_fig.savefig(buf, format="png", bbox_inches="tight", dpi=120)
-                                buf.seek(0)
-                                st.image(buf.getvalue())
-                                plt.close(cur_fig)
-                            else:
-                                st.info(t("msg_plot_not_found", lang))
+                            st.image(buf.getvalue(), use_container_width=True)
+                            plt.close(ret)
+                            displayed = True
+                        except (AttributeError, TypeError):
+                            pass
+
+                    # 4) Check for newly created png files
+                    if not displayed:
+                        _after = set(_glob.glob("*.png"))
+                        _new_files = _after - _before
+                        if _new_files:
+                            newest = max(_new_files, key=os.path.getmtime)
+                            st.image(newest, use_container_width=True)
+                            displayed = True
+
+                    # 5) Last resort: capture current matplotlib figure
+                    if not displayed:
+                        cur_fig = plt.gcf()
+                        if cur_fig.get_axes():
+                            buf = io.BytesIO()
+                            cur_fig.savefig(buf, format="png", bbox_inches="tight", dpi=120)
+                            buf.seek(0)
+                            st.image(buf.getvalue(), use_container_width=True)
+                            plt.close(cur_fig)
+                            displayed = True
+
+                    if not displayed:
+                        st.info(t("msg_plot_not_found", lang))
+
                 except Exception as e:
                     st.error(t("msg_plot_error", lang).format(e=e))
 
