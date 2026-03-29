@@ -1,7 +1,7 @@
 services:
-  pycaret-webui:
+  webui-for-pycaret:
     build: .
-    container_name: pycaret-webui
+    container_name: webui-for-pycaret
     ports:
       - "127.0.0.1:8501:8501"
     volumes:
