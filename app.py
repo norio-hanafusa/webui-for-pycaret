@@ -758,94 +758,121 @@ elif page == t("nav_results", lang):
                     plot_key = plot_options[selected_plot]
                     displayed = False
 
-                    # --- Strategy A: save=True (works for most plots) ---
-                    try:
-                        _before = set(_glob.glob("*.png"))
-                        if st.session_state.pycaret_task in ["clustering", "anomaly"]:
-                            ret = mod.plot_model(use_model, plot=plot_key, save=True)
-                        else:
-                            ret = mod.plot_model(use_model, plot=plot_key, save=True, verbose=False)
+                    def _call_plot_model(save=False, suppress_show=False):
+                        """Call mod.plot_model with appropriate args."""
+                        _restore = None
+                        if suppress_show:
+                            _restore = plt.show
+                            plt.show = lambda *a, **k: None
+                        try:
+                            kwargs = {"plot": plot_key}
+                            if save:
+                                kwargs["save"] = True
+                            if st.session_state.pycaret_task not in ["clustering", "anomaly"]:
+                                kwargs["verbose"] = False
+                            return mod.plot_model(use_model, **kwargs)
+                        finally:
+                            if _restore:
+                                plt.show = _restore
 
-                        # A1) Return value is a valid file path
-                        if isinstance(ret, str):
+                    def _is_plotly_fig(obj):
+                        """Check if obj is a plotly Figure."""
+                        try:
+                            import plotly.graph_objects as go
+                            return isinstance(obj, go.Figure)
+                        except ImportError:
+                            return False
+
+                    # --- Strategy A: save=True ---
+                    try:
+                        _before = set(_glob.glob("*.png")) | set(_glob.glob("*.html"))
+                        ret = _call_plot_model(save=True)
+
+                        # A1) Plotly figure returned
+                        if not displayed and _is_plotly_fig(ret):
+                            st.plotly_chart(ret, use_container_width=True)
+                            displayed = True
+
+                        # A2) File path returned
+                        if not displayed and isinstance(ret, str):
                             for candidate in [ret, os.path.basename(ret)]:
                                 if os.path.exists(candidate):
-                                    st.image(candidate, use_container_width=True)
+                                    if candidate.endswith(".html"):
+                                        import plotly.io as pio
+                                        pfig = pio.read_html(candidate)
+                                        st.plotly_chart(pfig, use_container_width=True)
+                                    else:
+                                        st.image(candidate, use_container_width=True)
                                     displayed = True
                                     break
 
-                        # A2) Return value is a matplotlib figure
-                        if not displayed and ret is not None and not isinstance(ret, str):
-                            if hasattr(ret, "savefig"):
-                                buf = io.BytesIO()
-                                ret.savefig(buf, format="png", bbox_inches="tight", dpi=120)
-                                buf.seek(0)
-                                st.image(buf.getvalue(), use_container_width=True)
-                                plt.close(ret)
-                                displayed = True
+                        # A3) Matplotlib figure returned
+                        if not displayed and ret is not None and not isinstance(ret, str) and hasattr(ret, "savefig"):
+                            buf = io.BytesIO()
+                            ret.savefig(buf, format="png", bbox_inches="tight", dpi=120)
+                            buf.seek(0)
+                            st.image(buf.getvalue(), use_container_width=True)
+                            plt.close(ret)
+                            displayed = True
 
-                        # A3) Check for newly created png files
+                        # A4) New files created
                         if not displayed:
-                            _after = set(_glob.glob("*.png"))
+                            _after = set(_glob.glob("*.png")) | set(_glob.glob("*.html"))
                             _new_files = _after - _before
                             if _new_files:
                                 newest = max(_new_files, key=os.path.getmtime)
-                                st.image(newest, use_container_width=True)
+                                if newest.endswith(".html"):
+                                    with open(newest, "r", encoding="utf-8") as f:
+                                        st.components.v1.html(f.read(), height=600, scrolling=True)
+                                else:
+                                    st.image(newest, use_container_width=True)
                                 displayed = True
 
                     except Exception:
-                        pass  # Strategy A failed, try B
+                        pass
 
-                    # --- Strategy B: suppress plt.show(), capture figure ---
+                    # --- Strategy B: no save, suppress plt.show, capture ---
                     if not displayed:
                         try:
-                            import matplotlib
-                            _orig_backend = matplotlib.get_backend()
-                            matplotlib.use("Agg")
-                            _orig_show = plt.show
-                            plt.show = lambda *a, **k: None  # suppress show
                             plt.close("all")
-                            try:
-                                if st.session_state.pycaret_task in ["clustering", "anomaly"]:
-                                    mod.plot_model(use_model, plot=plot_key)
-                                else:
-                                    mod.plot_model(use_model, plot=plot_key, verbose=False)
-                            finally:
-                                plt.show = _orig_show
-                            # Collect all open figures
-                            fig_nums = plt.get_fignums()
-                            if fig_nums:
-                                for fn in fig_nums:
-                                    fig = plt.figure(fn)
-                                    if fig.get_axes():
-                                        buf = io.BytesIO()
-                                        fig.savefig(buf, format="png", bbox_inches="tight", dpi=120)
-                                        buf.seek(0)
-                                        st.image(buf.getvalue(), use_container_width=True)
-                                        displayed = True
-                                plt.close("all")
+                            ret = _call_plot_model(save=False, suppress_show=True)
+
+                            # B1) Plotly figure
+                            if _is_plotly_fig(ret):
+                                st.plotly_chart(ret, use_container_width=True)
+                                displayed = True
+
+                            # B2) Matplotlib figures
+                            if not displayed:
+                                fig_nums = plt.get_fignums()
+                                if fig_nums:
+                                    for fn in fig_nums:
+                                        fig = plt.figure(fn)
+                                        if fig.get_axes():
+                                            buf = io.BytesIO()
+                                            fig.savefig(buf, format="png", bbox_inches="tight", dpi=120)
+                                            buf.seek(0)
+                                            st.image(buf.getvalue(), use_container_width=True)
+                                            displayed = True
+                                    plt.close("all")
                         except Exception:
                             pass
 
-                    # --- Strategy C: st.pyplot fallback ---
+                    # --- Strategy C: st.pyplot / st.plotly_chart fallback ---
                     if not displayed:
                         try:
-                            _orig_show = plt.show
-                            plt.show = lambda *a, **k: None
                             plt.close("all")
-                            try:
-                                if st.session_state.pycaret_task in ["clustering", "anomaly"]:
-                                    mod.plot_model(use_model, plot=plot_key)
-                                else:
-                                    mod.plot_model(use_model, plot=plot_key, verbose=False)
-                            finally:
-                                plt.show = _orig_show
-                            fig_nums = plt.get_fignums()
-                            if fig_nums:
-                                for fn in fig_nums:
-                                    st.pyplot(plt.figure(fn))
-                                plt.close("all")
+                            ret = _call_plot_model(save=False, suppress_show=True)
+                            if _is_plotly_fig(ret):
+                                st.plotly_chart(ret, use_container_width=True)
                                 displayed = True
+                            else:
+                                fig_nums = plt.get_fignums()
+                                if fig_nums:
+                                    for fn in fig_nums:
+                                        st.pyplot(plt.figure(fn))
+                                    plt.close("all")
+                                    displayed = True
                         except Exception:
                             pass
 
