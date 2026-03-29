@@ -132,11 +132,11 @@ def get_module(task: str):
     """Return the correct PyCaret module for the given task key."""
     if task == "classification":
         from pycaret import classification as mod
-    elif key == "regression":
+    elif task == "regression":
         from pycaret import regression as mod
-    elif key == "clustering":
+    elif task == "clustering":
         from pycaret import clustering as mod
-    elif key == "anomaly":
+    elif task == "anomaly":
         from pycaret import anomaly as mod
     else:
         mod = None
