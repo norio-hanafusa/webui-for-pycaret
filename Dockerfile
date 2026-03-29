@@ -13,6 +13,7 @@ WORKDIR /app
 
 # Copy application
 COPY app.py /app/app.py
+COPY i18n.py /app/i18n.py
 
 # Expose Streamlit port
 EXPOSE 8501
