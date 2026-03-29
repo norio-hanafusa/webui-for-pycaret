@@ -763,7 +763,8 @@ elif page == t("nav_results", lang):
         if st.button(t("btn_generate_plot", lang)):
             with st.spinner(t("msg_plot_generating", lang)):
                 try:
-                    if st.session_state.pycaret_task in ["clustering", "anomaly"]:
+                    _current_task = _TASK_MAP.get(st.session_state.pycaret_task)
+                    if _current_task in ["clustering", "anomaly"]:
                         fig_path = mod.plot_model(use_model, plot=plot_options[selected_plot], save=True)
                     else:
                         fig_path = mod.plot_model(use_model, plot=plot_options[selected_plot], save=True, verbose=False)
