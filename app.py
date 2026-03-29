@@ -120,22 +120,17 @@ st.markdown("---")
 # Helper functions
 # ===================================================================
 
-_TASK_MAP = {
-    "分類 (Classification)": "classification",
-    "Classification": "classification",
-    "回帰 (Regression)": "regression",
-    "Regression": "regression",
-    "クラスタリング (Clustering)": "clustering",
-    "Clustering": "clustering",
-    "異常検知 (Anomaly Detection)": "anomaly",
-    "Anomaly Detection": "anomaly",
+_TASK_LABELS = {
+    "classification": "opt_classification",
+    "regression": "opt_regression",
+    "clustering": "opt_clustering",
+    "anomaly": "opt_anomaly",
 }
 
 
 def get_module(task: str):
-    """Return the correct PyCaret module for the given task."""
-    key = _TASK_MAP.get(task)
-    if key == "classification":
+    """Return the correct PyCaret module for the given task key."""
+    if task == "classification":
         from pycaret import classification as mod
     elif key == "regression":
         from pycaret import regression as mod
@@ -314,17 +309,13 @@ elif page == t("nav_ml", lang):
         # --- Task selection ---
         task = st.selectbox(
             t("label_select_task", lang),
-            [
-                t("opt_classification", lang),
-                t("opt_regression", lang),
-                t("opt_clustering", lang),
-                t("opt_anomaly", lang),
-            ],
+            list(_TASK_LABELS.keys()),
+            format_func=lambda k: t(_TASK_LABELS[k], lang),
         )
         st.session_state.pycaret_task = task
         mod = get_module(task)
 
-        is_supervised = _TASK_MAP.get(task) in ["classification", "regression"]
+        is_supervised = task in ["classification", "regression"]
 
         target_col = None
         if is_supervised:
@@ -340,7 +331,7 @@ elif page == t("nav_ml", lang):
 
             with col_opt1:
                 # --- Imbalanced data (classification only) ---
-                if _TASK_MAP.get(task) == "classification":
+                if task == "classification":
                     fix_imbalance = st.checkbox(
                         t("label_smote", lang), value=False,
                         help=t("msg_smote_desc", lang),
@@ -431,7 +422,7 @@ elif page == t("nav_ml", lang):
                             setup_kwargs["outliers_threshold"] = outliers_threshold
 
                         # Imbalanced data (classification only)
-                        if _TASK_MAP.get(task) == "classification" and fix_imbalance:
+                        if task == "classification" and fix_imbalance:
                             setup_kwargs["fix_imbalance"] = True
                             if fix_imbalance_method is not None:
                                 setup_kwargs["fix_imbalance_method"] = fix_imbalance_method
@@ -443,7 +434,7 @@ elif page == t("nav_ml", lang):
                     st.success(t("msg_setup_complete", lang))
 
                     # Show setup summary
-                    if fix_imbalance and _TASK_MAP.get(task) == "classification":
+                    if fix_imbalance and task == "classification":
                         method_name = type(fix_imbalance_method).__name__ if fix_imbalance_method else "SMOTE"
                         st.info(t("msg_smote_applied", lang).format(method=method_name))
 
@@ -507,7 +498,7 @@ elif page == t("nav_ml", lang):
                         status_text.empty()
 
                         if trained_models:
-                            if _TASK_MAP.get(task) == "classification":
+                            if task == "classification":
                                 sort_col = "Accuracy"
                             else:
                                 sort_col = "R2"
@@ -537,7 +528,7 @@ elif page == t("nav_ml", lang):
 
             else:
                 # Unsupervised - create model
-                if _TASK_MAP.get(task) == "clustering":
+                if task == "clustering":
                     model_name = st.selectbox(t("label_clustering_algo", lang), ["kmeans", "ap", "meanshift", "sc", "hclust", "dbscan", "optics", "birch"])
                     n_clusters = st.slider(t("label_num_clusters", lang), 2, 20, 4)
                     if st.button(t("btn_create_model", lang)):
@@ -552,7 +543,7 @@ elif page == t("nav_ml", lang):
                             except Exception as e:
                                 st.error(t("msg_error", lang).format(e=e))
 
-                elif _TASK_MAP.get(task) == "anomaly":
+                elif task == "anomaly":
                     model_name = st.selectbox(t("label_anomaly_algo", lang), ["iforest", "knn", "lof", "svm", "pca", "mcd", "sod", "histogram"])
                     fraction = st.slider(t("label_anomaly_fraction", lang), 0.01, 0.5, 0.05, 0.01)
                     if st.button(t("btn_create_model", lang)):
@@ -571,7 +562,7 @@ elif page == t("nav_ml", lang):
             if is_supervised and st.session_state.best_model is not None:
                 st.subheader(t("heading_tuning", lang))
 
-                if _TASK_MAP.get(task) == "classification":
+                if task == "classification":
                     optimize_options = ["Accuracy", "AUC", "Recall", "Precision", "F1", "Kappa", "MCC"]
                 else:
                     optimize_options = ["MAE", "MSE", "RMSE", "R2", "RMSLE", "MAPE"]
@@ -720,13 +711,13 @@ elif page == t("nav_results", lang):
         task = st.session_state.pycaret_task
         mod = get_module(task)
         use_model = st.session_state.tuned_model or st.session_state.best_model
-        is_supervised = _TASK_MAP.get(task) in ["classification", "regression"]
+        is_supervised = task in ["classification", "regression"]
 
         # --- PyCaret built-in plots ---
         st.subheader(t("heading_pycaret_viz", lang))
 
         if is_supervised:
-            if _TASK_MAP.get(task) == "classification":
+            if task == "classification":
                 plot_options = {
                     t("plot_auc", lang): "auc",
                     t("plot_confusion_matrix", lang): "confusion_matrix",
@@ -745,7 +736,7 @@ elif page == t("nav_results", lang):
                     "Cook's Distance": "cooks",
                 }
         else:
-            if _TASK_MAP.get(task) == "clustering":
+            if task == "clustering":
                 plot_options = {
                     t("plot_cluster_distribution", lang): "cluster",
                     t("plot_elbow", lang): "elbow",
@@ -763,8 +754,7 @@ elif page == t("nav_results", lang):
         if st.button(t("btn_generate_plot", lang)):
             with st.spinner(t("msg_plot_generating", lang)):
                 try:
-                    _current_task = _TASK_MAP.get(st.session_state.pycaret_task)
-                    if _current_task in ["clustering", "anomaly"]:
+                    if st.session_state.pycaret_task in ["clustering", "anomaly"]:
                         fig_path = mod.plot_model(use_model, plot=plot_options[selected_plot], save=True)
                     else:
                         fig_path = mod.plot_model(use_model, plot=plot_options[selected_plot], save=True, verbose=False)
@@ -1151,7 +1141,7 @@ elif page == t("nav_results", lang):
                             feature_names_lime = [f"feature_{i}" for i in range(X_transformed.shape[1])]
                             X_np = np.array(X_transformed)
 
-                        is_classification = _TASK_MAP.get(task) == "classification"
+                        is_classification = task == "classification"
 
                         if is_classification:
                             y_vals = y_train.unique() if hasattr(y_train, "unique") else np.unique(y_train)
@@ -1302,7 +1292,7 @@ elif page == t("nav_predict", lang):
         task = st.session_state.pycaret_task
         mod = get_module(task) if task else None
         use_model = st.session_state.tuned_model or st.session_state.best_model or st.session_state.loaded_model
-        is_supervised = _TASK_MAP.get(task) in ["classification", "regression"] if task else True
+        is_supervised = task in ["classification", "regression"] if task else True
 
         # Show which model is being used
         if st.session_state.loaded_model is not None and st.session_state.loaded_model_name:
@@ -1391,12 +1381,8 @@ elif page == t("nav_load_model", lang):
     # --- Task selection (needed to use the model with PyCaret) ---
     load_task = st.selectbox(
         t("label_task_type", lang),
-        [
-            t("opt_classification", lang),
-            t("opt_regression", lang),
-            t("opt_clustering", lang),
-            t("opt_anomaly", lang),
-        ],
+        ["classification", "regression", "clustering", "anomaly"],
+        format_func=lambda k: t(_TASK_LABELS[k], lang),
         key="load_task_select",
     )
 
