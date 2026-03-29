@@ -755,59 +755,79 @@ elif page == t("nav_results", lang):
             with st.spinner(t("msg_plot_generating", lang)):
                 try:
                     import glob as _glob
-                    # Record existing png files before plotting
-                    _before = set(_glob.glob("*.png"))
-
                     plot_key = plot_options[selected_plot]
-                    if st.session_state.pycaret_task in ["clustering", "anomaly"]:
-                        ret = mod.plot_model(use_model, plot=plot_key, save=True)
-                    else:
-                        ret = mod.plot_model(use_model, plot=plot_key, save=True, verbose=False)
-
-                    # --- Determine how to display the result ---
                     displayed = False
 
-                    # 1) Return value is a valid file path
-                    if isinstance(ret, str) and os.path.exists(ret):
-                        st.image(ret, use_container_width=True)
-                        displayed = True
+                    # --- Strategy A: save=True (works for most plots) ---
+                    try:
+                        _before = set(_glob.glob("*.png"))
+                        if st.session_state.pycaret_task in ["clustering", "anomaly"]:
+                            ret = mod.plot_model(use_model, plot=plot_key, save=True)
+                        else:
+                            ret = mod.plot_model(use_model, plot=plot_key, save=True, verbose=False)
 
-                    # 2) Return value is a string (filename without path check - PyCaret sometimes returns just name)
-                    if not displayed and isinstance(ret, str) and os.path.exists(os.path.basename(ret)):
-                        st.image(os.path.basename(ret), use_container_width=True)
-                        displayed = True
+                        # A1) Return value is a valid file path
+                        if isinstance(ret, str):
+                            for candidate in [ret, os.path.basename(ret)]:
+                                if os.path.exists(candidate):
+                                    st.image(candidate, use_container_width=True)
+                                    displayed = True
+                                    break
 
-                    # 3) Return value is a matplotlib figure
-                    if not displayed and ret is not None and not isinstance(ret, str):
+                        # A2) Return value is a matplotlib figure
+                        if not displayed and ret is not None and not isinstance(ret, str):
+                            if hasattr(ret, "savefig"):
+                                buf = io.BytesIO()
+                                ret.savefig(buf, format="png", bbox_inches="tight", dpi=120)
+                                buf.seek(0)
+                                st.image(buf.getvalue(), use_container_width=True)
+                                plt.close(ret)
+                                displayed = True
+
+                        # A3) Check for newly created png files
+                        if not displayed:
+                            _after = set(_glob.glob("*.png"))
+                            _new_files = _after - _before
+                            if _new_files:
+                                newest = max(_new_files, key=os.path.getmtime)
+                                st.image(newest, use_container_width=True)
+                                displayed = True
+
+                    except Exception:
+                        pass  # Strategy A failed, try B
+
+                    # --- Strategy B: no save, capture matplotlib figure ---
+                    if not displayed:
                         try:
-                            buf = io.BytesIO()
-                            ret.savefig(buf, format="png", bbox_inches="tight", dpi=120)
-                            buf.seek(0)
-                            st.image(buf.getvalue(), use_container_width=True)
-                            plt.close(ret)
-                            displayed = True
-                        except (AttributeError, TypeError):
+                            plt.close("all")
+                            if st.session_state.pycaret_task in ["clustering", "anomaly"]:
+                                mod.plot_model(use_model, plot=plot_key)
+                            else:
+                                mod.plot_model(use_model, plot=plot_key, verbose=False)
+                            fig = plt.gcf()
+                            if fig.get_axes():
+                                buf = io.BytesIO()
+                                fig.savefig(buf, format="png", bbox_inches="tight", dpi=120)
+                                buf.seek(0)
+                                st.image(buf.getvalue(), use_container_width=True)
+                                plt.close(fig)
+                                displayed = True
+                        except Exception:
                             pass
 
-                    # 4) Check for newly created png files
+                    # --- Strategy C: st.pyplot fallback ---
                     if not displayed:
-                        _after = set(_glob.glob("*.png"))
-                        _new_files = _after - _before
-                        if _new_files:
-                            newest = max(_new_files, key=os.path.getmtime)
-                            st.image(newest, use_container_width=True)
+                        try:
+                            plt.close("all")
+                            if st.session_state.pycaret_task in ["clustering", "anomaly"]:
+                                mod.plot_model(use_model, plot=plot_key)
+                            else:
+                                mod.plot_model(use_model, plot=plot_key, verbose=False)
+                            st.pyplot(plt.gcf())
+                            plt.close("all")
                             displayed = True
-
-                    # 5) Last resort: capture current matplotlib figure
-                    if not displayed:
-                        cur_fig = plt.gcf()
-                        if cur_fig.get_axes():
-                            buf = io.BytesIO()
-                            cur_fig.savefig(buf, format="png", bbox_inches="tight", dpi=120)
-                            buf.seek(0)
-                            st.image(buf.getvalue(), use_container_width=True)
-                            plt.close(cur_fig)
-                            displayed = True
+                        except Exception:
+                            pass
 
                     if not displayed:
                         st.info(t("msg_plot_not_found", lang))
