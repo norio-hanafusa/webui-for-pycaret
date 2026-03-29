@@ -763,7 +763,10 @@ elif page == t("nav_results", lang):
         if st.button(t("btn_generate_plot", lang)):
             with st.spinner(t("msg_plot_generating", lang)):
                 try:
-                    fig_path = mod.plot_model(use_model, plot=plot_options[selected_plot], save=True, verbose=False)
+                    if task_type in ["clustering", "anomaly"]:
+                        fig_path = mod.plot_model(use_model, plot=plot_options[selected_plot], save=True)
+                    else:
+                        fig_path = mod.plot_model(use_model, plot=plot_options[selected_plot], save=True, verbose=False)
                     # PyCaret saves plot as .png in current directory
                     if isinstance(fig_path, str) and os.path.exists(fig_path):
                         st.image(fig_path)
