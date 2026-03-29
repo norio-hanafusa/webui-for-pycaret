@@ -141,6 +141,28 @@ The development followed an iterative process:
 
 ## License
 
-Copyright (c) 2026 norio-hanafusa. All rights reserved.
+This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
 
-This project uses PyCaret and its dependencies. Please refer to the respective licenses of each library.
+Copyright (c) 2026 norio-hanafusa
+
+### Third-Party Licenses
+
+This project depends on the following open-source libraries.
+Users and redistributors must comply with each library's license terms.
+
+| Library | License | URL |
+|---|---|---|
+| PyCaret | MIT | https://github.com/pycaret/pycaret |
+| Streamlit | Apache 2.0 | https://github.com/streamlit/streamlit |
+| SHAP | MIT | https://github.com/shap/shap |
+| LIME | BSD 2-Clause | https://github.com/marcotcr/lime |
+| scikit-learn | BSD 3-Clause | https://github.com/scikit-learn/scikit-learn |
+| LightGBM | MIT | https://github.com/microsoft/LightGBM |
+| XGBoost | Apache 2.0 | https://github.com/dmlc/xgboost |
+| CatBoost | Apache 2.0 | https://github.com/catboost/catboost |
+| pandas | BSD 3-Clause | https://github.com/pandas-dev/pandas |
+| NumPy | BSD 3-Clause | https://github.com/numpy/numpy |
+| matplotlib | PSF-based | https://github.com/matplotlib/matplotlib |
+| streamlit-aggrid | MIT | https://github.com/PablocFonseca/streamlit-aggrid |
+| openpyxl | MIT | https://github.com/theorchard/openpyxl |
+| xlsxwriter | BSD 2-Clause | https://github.com/jmcnamara/XlsxWriter |
