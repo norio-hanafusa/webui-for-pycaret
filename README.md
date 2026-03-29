@@ -115,6 +115,15 @@ webui-for-pycaret/
 
 ---
 
+## Known Issues
+
+| Issue | Description |
+|---|---|
+| Clustering -- Plot display | Some PyCaret visualization plots (e.g., Cluster Distribution) may fail to render due to incompatibilities between PyCaret's internal plotting backend (plotly/yellowbrick) and Streamlit's image capture. Elbow and Silhouette plots work correctly. |
+| Anomaly Detection -- Plot display | Similar to clustering, certain anomaly detection visualization plots may produce errors when PyCaret uses a non-matplotlib backend internally. |
+
+---
+
 ## Documentation
 
 See [MANUAL.md](MANUAL.md) for the full user manual in Japanese and English.
