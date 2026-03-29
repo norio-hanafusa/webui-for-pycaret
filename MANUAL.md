@@ -81,7 +81,7 @@ docker compose down
 ### ディレクトリ構成
 
 ```
-pycaret-webui/
+webui-for-pycaret/
   app.py              -- メインアプリケーション
   i18n.py             -- 多言語対応 (日本語/英語)
   requirements.txt    -- 追加 Python パッケージ
@@ -500,9 +500,9 @@ LIME の解析結果も SHAP と同様にセッションステートにキャッ
 
 ```yaml
 services:
-  pycaret-webui:
+  webui-for-pycaret:
     build: .
-    container_name: pycaret-webui
+    container_name: webui-for-pycaret
     ports:
       - "127.0.0.1:8501:8501"
     volumes:
@@ -622,7 +622,7 @@ docker compose down
 ### Directory Structure
 
 ```
-pycaret-webui/
+webui-for-pycaret/
   app.py              -- Main application
   i18n.py             -- Internationalization (Japanese/English)
   requirements.txt    -- Additional Python packages
@@ -1041,9 +1041,9 @@ Switch between Japanese (ja) and English (en) using the language selector in the
 
 ```yaml
 services:
-  pycaret-webui:
+  webui-for-pycaret:
     build: .
-    container_name: pycaret-webui
+    container_name: webui-for-pycaret
     ports:
       - "127.0.0.1:8501:8501"
     volumes:

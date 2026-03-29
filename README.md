@@ -30,8 +30,8 @@ No-code machine learning platform built on [PyCaret](https://pycaret.org/) with 
 ### Start
 
 ```bash
-git clone https://github.com/norio-hanafusa/pycaret-webui.git
-cd pycaret-webui
+git clone https://github.com/norio-hanafusa/webui-for-pycaret.git
+cd webui-for-pycaret
 docker compose up --build -d
 ```
 
@@ -48,7 +48,7 @@ docker compose down
 ## Project Structure
 
 ```
-pycaret-webui/
+webui-for-pycaret/
   app.py              -- Main application
   i18n.py             -- Internationalization (Japanese / English)
   requirements.txt    -- Additional Python packages
