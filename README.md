@@ -121,6 +121,26 @@ See [MANUAL.md](MANUAL.md) for the full user manual in Japanese and English.
 
 ---
 
+## Author / Development Process
+
+This project was developed by [norio-hanafusa](https://github.com/norio-hanafusa).
+
+All requirements definition, architectural decisions, feature specifications,
+testing, bug reporting, and iterative refinement instructions were provided
+by the author. Code generation was assisted by Claude Code (Anthropic),
+functioning as an AI-powered development tool under the author's direction.
+
+The development followed an iterative process:
+1. The author defined feature requirements and specifications
+2. Claude Code generated code based on those instructions
+3. The author tested the output and identified issues
+4. The author provided correction instructions and additional requirements
+5. Steps 2-4 were repeated until each feature met the author's standards
+
+---
+
 ## License
+
+Copyright (c) 2026 norio-hanafusa. All rights reserved.
 
 This project uses PyCaret and its dependencies. Please refer to the respective licenses of each library.
