@@ -796,36 +796,56 @@ elif page == t("nav_results", lang):
                     except Exception:
                         pass  # Strategy A failed, try B
 
-                    # --- Strategy B: no save, capture matplotlib figure ---
+                    # --- Strategy B: suppress plt.show(), capture figure ---
                     if not displayed:
                         try:
+                            import matplotlib
+                            _orig_backend = matplotlib.get_backend()
+                            matplotlib.use("Agg")
+                            _orig_show = plt.show
+                            plt.show = lambda *a, **k: None  # suppress show
                             plt.close("all")
-                            if st.session_state.pycaret_task in ["clustering", "anomaly"]:
-                                mod.plot_model(use_model, plot=plot_key)
-                            else:
-                                mod.plot_model(use_model, plot=plot_key, verbose=False)
-                            fig = plt.gcf()
-                            if fig.get_axes():
-                                buf = io.BytesIO()
-                                fig.savefig(buf, format="png", bbox_inches="tight", dpi=120)
-                                buf.seek(0)
-                                st.image(buf.getvalue(), use_container_width=True)
-                                plt.close(fig)
-                                displayed = True
+                            try:
+                                if st.session_state.pycaret_task in ["clustering", "anomaly"]:
+                                    mod.plot_model(use_model, plot=plot_key)
+                                else:
+                                    mod.plot_model(use_model, plot=plot_key, verbose=False)
+                            finally:
+                                plt.show = _orig_show
+                            # Collect all open figures
+                            fig_nums = plt.get_fignums()
+                            if fig_nums:
+                                for fn in fig_nums:
+                                    fig = plt.figure(fn)
+                                    if fig.get_axes():
+                                        buf = io.BytesIO()
+                                        fig.savefig(buf, format="png", bbox_inches="tight", dpi=120)
+                                        buf.seek(0)
+                                        st.image(buf.getvalue(), use_container_width=True)
+                                        displayed = True
+                                plt.close("all")
                         except Exception:
                             pass
 
                     # --- Strategy C: st.pyplot fallback ---
                     if not displayed:
                         try:
+                            _orig_show = plt.show
+                            plt.show = lambda *a, **k: None
                             plt.close("all")
-                            if st.session_state.pycaret_task in ["clustering", "anomaly"]:
-                                mod.plot_model(use_model, plot=plot_key)
-                            else:
-                                mod.plot_model(use_model, plot=plot_key, verbose=False)
-                            st.pyplot(plt.gcf())
-                            plt.close("all")
-                            displayed = True
+                            try:
+                                if st.session_state.pycaret_task in ["clustering", "anomaly"]:
+                                    mod.plot_model(use_model, plot=plot_key)
+                                else:
+                                    mod.plot_model(use_model, plot=plot_key, verbose=False)
+                            finally:
+                                plt.show = _orig_show
+                            fig_nums = plt.get_fignums()
+                            if fig_nums:
+                                for fn in fig_nums:
+                                    st.pyplot(plt.figure(fn))
+                                plt.close("all")
+                                displayed = True
                         except Exception:
                             pass
 
