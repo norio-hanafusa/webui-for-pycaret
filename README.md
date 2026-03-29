@@ -1,4 +1,4 @@
-# PyCaret WebUI
+# WebUI for PyCaret
 
 No-code machine learning platform built on [PyCaret](https://pycaret.org/) with a Streamlit web interface.
 

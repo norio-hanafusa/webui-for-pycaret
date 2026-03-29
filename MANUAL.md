@@ -1,4 +1,4 @@
-# PyCaret WebUI User Manual / PyCaret WebUI 取扱説明書
+# WebUI for PyCaret User Manual / WebUI for PyCaret 取扱説明書
 
 ---
 
@@ -8,7 +8,7 @@
 
 ## 1. 概要
 
-PyCaret WebUI は、PyCaret ライブラリを基盤としたノーコード機械学習プラットフォームです。Streamlit ベースの Web インターフェースにより、ブラウザ上でデータの読み込み、前処理、モデル学習、ハイパーパラメータチューニング、予測、結果の可視化、SHAP/LIME 解析までの一連の機械学習ワークフローをコードを書くことなく実行できます。
+WebUI for PyCaret は、PyCaret ライブラリを基盤としたノーコード機械学習プラットフォームです。Streamlit ベースの Web インターフェースにより、ブラウザ上でデータの読み込み、前処理、モデル学習、ハイパーパラメータチューニング、予測、結果の可視化、SHAP/LIME 解析までの一連の機械学習ワークフローをコードを書くことなく実行できます。
 
 Docker コンテナとして動作し、`pycaret/full` イメージをベースに構築されているため、PyCaret が対応する全てのアルゴリズムと機能を利用できます。
 
@@ -96,7 +96,7 @@ pycaret-webui/
 
 ## 4. ページ別操作ガイド
 
-PyCaret WebUI は画面上部の水平タブで各ページに切り替えます。全 7 ページで構成されています。
+WebUI for PyCaret は画面上部の水平タブで各ページに切り替えます。全 7 ページで構成されています。
 
 画面右上の「言語 / Language」セレクタで日本語と英語を切り替えられます。
 
@@ -549,7 +549,7 @@ services:
 
 ## 1. Overview
 
-PyCaret WebUI is a no-code machine learning platform built on top of the PyCaret library. Through a Streamlit-based web interface, users can execute the entire machine learning workflow -- from data loading, preprocessing, model training, hyperparameter tuning, prediction, result visualization, to SHAP/LIME analysis -- all without writing any code.
+WebUI for PyCaret is a no-code machine learning platform built on top of the PyCaret library. Through a Streamlit-based web interface, users can execute the entire machine learning workflow -- from data loading, preprocessing, model training, hyperparameter tuning, prediction, result visualization, to SHAP/LIME analysis -- all without writing any code.
 
 The application runs as a Docker container based on the `pycaret/full` image, providing access to all algorithms and features supported by PyCaret.
 
@@ -637,7 +637,7 @@ pycaret-webui/
 
 ## 4. User Guide by Page
 
-PyCaret WebUI uses horizontal tabs at the top of the screen for navigation. The application consists of 7 pages.
+WebUI for PyCaret uses horizontal tabs at the top of the screen for navigation. The application consists of 7 pages.
 
 The language can be switched between Japanese and English using the selector in the upper right corner of the screen.
 

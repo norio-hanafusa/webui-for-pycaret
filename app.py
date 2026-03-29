@@ -1,5 +1,5 @@
 """
-PyCaret WebUI - No-Code Machine Learning Platform
+WebUI for PyCaret - No-Code Machine Learning Platform
 Based on pycaret/full Docker image
 """
 
@@ -22,7 +22,7 @@ warnings.filterwarnings("ignore")
 # Streamlit page config
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="PyCaret WebUI",
+    page_title="WebUI for PyCaret",
     page_icon=None,
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -1674,6 +1674,6 @@ elif page == t("nav_save_export", lang):
 # ===================================================================
 st.markdown("---")
 st.markdown(
-    "**PyCaret WebUI** -- Built on `pycaret/full` -- Powered by Streamlit",
+    "**WebUI for PyCaret** -- Built on `pycaret/full` -- Powered by Streamlit",
     unsafe_allow_html=False,
 )

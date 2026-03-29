@@ -1,9 +1,9 @@
-"""Internationalization for PyCaret WebUI."""
+"""Internationalization for WebUI for PyCaret."""
 
 LANG = {
     "ja": {
         # App title
-        "page_title": "PyCaret WebUI",
+        "page_title": "WebUI for PyCaret",
 
         # Navigation
         "nav_data_load": "データ読み込み",
@@ -293,7 +293,7 @@ LANG = {
     },
     "en": {
         # App title
-        "page_title": "PyCaret WebUI",
+        "page_title": "WebUI for PyCaret",
 
         # Navigation
         "nav_data_load": "Data Loading",
