@@ -758,9 +758,19 @@ elif page == t("nav_results", lang):
                         fig_path = mod.plot_model(use_model, plot=plot_options[selected_plot], save=True)
                     else:
                         fig_path = mod.plot_model(use_model, plot=plot_options[selected_plot], save=True, verbose=False)
-                    # PyCaret saves plot as .png in current directory
+                    # PyCaret may return a file path (str), a figure, or None
                     if isinstance(fig_path, str) and os.path.exists(fig_path):
                         st.image(fig_path)
+                    elif fig_path is not None and not isinstance(fig_path, str):
+                        # Could be a matplotlib figure or other object
+                        try:
+                            buf = io.BytesIO()
+                            fig_path.savefig(buf, format="png", bbox_inches="tight", dpi=120)
+                            buf.seek(0)
+                            st.image(buf.getvalue())
+                        except AttributeError:
+                            # Not a figure object; try displaying directly
+                            st.pyplot(fig_path)
                     else:
                         # Fallback: look for recently created png files
                         png_files = sorted(
@@ -771,7 +781,16 @@ elif page == t("nav_results", lang):
                         if png_files:
                             st.image(png_files[0])
                         else:
-                            st.info(t("msg_plot_not_found", lang))
+                            # Last resort: try capturing current matplotlib figure
+                            cur_fig = plt.gcf()
+                            if cur_fig.get_axes():
+                                buf = io.BytesIO()
+                                cur_fig.savefig(buf, format="png", bbox_inches="tight", dpi=120)
+                                buf.seek(0)
+                                st.image(buf.getvalue())
+                                plt.close(cur_fig)
+                            else:
+                                st.info(t("msg_plot_not_found", lang))
                 except Exception as e:
                     st.error(t("msg_plot_error", lang).format(e=e))
 
