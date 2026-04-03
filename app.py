@@ -61,6 +61,11 @@ DEFAULTS = {
     # SHAP / LIME cached results
     "shap_results": [],   # list of dicts: {type, fig_bytes, html, params}
     "lime_results": [],   # list of dicts: {fig_bytes, table_df, proba_df, intercept, score, sample_idx}
+    # SHAP一括計算キャッシュ (auto-sklearn-app.py と同方式)
+    "shap_cached_explanation": None,   # shap.Explanation オブジェクト
+    "shap_cached_sv_array": None,      # numpy array (n_samples, n_features)
+    "shap_cached_feature_names": None, # list of feature names
+    "shap_cached_n_samples": None,     # キャッシュ時のサンプル数（変更検知用）
     "lang": "ja",
 }
 for k, v in DEFAULTS.items():
@@ -120,23 +125,28 @@ st.markdown("---")
 # Helper functions
 # ===================================================================
 
-_TASK_LABELS = {
-    "classification": "opt_classification",
-    "regression": "opt_regression",
-    "clustering": "opt_clustering",
-    "anomaly": "opt_anomaly",
+_TASK_MAP = {
+    "分類 (Classification)": "classification",
+    "Classification": "classification",
+    "回帰 (Regression)": "regression",
+    "Regression": "regression",
+    "クラスタリング (Clustering)": "clustering",
+    "Clustering": "clustering",
+    "異常検知 (Anomaly Detection)": "anomaly",
+    "Anomaly Detection": "anomaly",
 }
 
 
 def get_module(task: str):
-    """Return the correct PyCaret module for the given task key."""
-    if task == "classification":
+    """Return the correct PyCaret module for the given task."""
+    key = _TASK_MAP.get(task)
+    if key == "classification":
         from pycaret import classification as mod
-    elif task == "regression":
+    elif key == "regression":
         from pycaret import regression as mod
-    elif task == "clustering":
+    elif key == "clustering":
         from pycaret import clustering as mod
-    elif task == "anomaly":
+    elif key == "anomaly":
         from pycaret import anomaly as mod
     else:
         mod = None
@@ -309,13 +319,17 @@ elif page == t("nav_ml", lang):
         # --- Task selection ---
         task = st.selectbox(
             t("label_select_task", lang),
-            list(_TASK_LABELS.keys()),
-            format_func=lambda k: t(_TASK_LABELS[k], lang),
+            [
+                t("opt_classification", lang),
+                t("opt_regression", lang),
+                t("opt_clustering", lang),
+                t("opt_anomaly", lang),
+            ],
         )
         st.session_state.pycaret_task = task
         mod = get_module(task)
 
-        is_supervised = task in ["classification", "regression"]
+        is_supervised = _TASK_MAP.get(task) in ["classification", "regression"]
 
         target_col = None
         if is_supervised:
@@ -331,7 +345,7 @@ elif page == t("nav_ml", lang):
 
             with col_opt1:
                 # --- Imbalanced data (classification only) ---
-                if task == "classification":
+                if _TASK_MAP.get(task) == "classification":
                     fix_imbalance = st.checkbox(
                         t("label_smote", lang), value=False,
                         help=t("msg_smote_desc", lang),
@@ -422,7 +436,7 @@ elif page == t("nav_ml", lang):
                             setup_kwargs["outliers_threshold"] = outliers_threshold
 
                         # Imbalanced data (classification only)
-                        if task == "classification" and fix_imbalance:
+                        if _TASK_MAP.get(task) == "classification" and fix_imbalance:
                             setup_kwargs["fix_imbalance"] = True
                             if fix_imbalance_method is not None:
                                 setup_kwargs["fix_imbalance_method"] = fix_imbalance_method
@@ -434,7 +448,7 @@ elif page == t("nav_ml", lang):
                     st.success(t("msg_setup_complete", lang))
 
                     # Show setup summary
-                    if fix_imbalance and task == "classification":
+                    if fix_imbalance and _TASK_MAP.get(task) == "classification":
                         method_name = type(fix_imbalance_method).__name__ if fix_imbalance_method else "SMOTE"
                         st.info(t("msg_smote_applied", lang).format(method=method_name))
 
@@ -498,7 +512,7 @@ elif page == t("nav_ml", lang):
                         status_text.empty()
 
                         if trained_models:
-                            if task == "classification":
+                            if _TASK_MAP.get(task) == "classification":
                                 sort_col = "Accuracy"
                             else:
                                 sort_col = "R2"
@@ -528,7 +542,7 @@ elif page == t("nav_ml", lang):
 
             else:
                 # Unsupervised - create model
-                if task == "clustering":
+                if _TASK_MAP.get(task) == "clustering":
                     model_name = st.selectbox(t("label_clustering_algo", lang), ["kmeans", "ap", "meanshift", "sc", "hclust", "dbscan", "optics", "birch"])
                     n_clusters = st.slider(t("label_num_clusters", lang), 2, 20, 4)
                     if st.button(t("btn_create_model", lang)):
@@ -543,7 +557,7 @@ elif page == t("nav_ml", lang):
                             except Exception as e:
                                 st.error(t("msg_error", lang).format(e=e))
 
-                elif task == "anomaly":
+                elif _TASK_MAP.get(task) == "anomaly":
                     model_name = st.selectbox(t("label_anomaly_algo", lang), ["iforest", "knn", "lof", "svm", "pca", "mcd", "sod", "histogram"])
                     fraction = st.slider(t("label_anomaly_fraction", lang), 0.01, 0.5, 0.05, 0.01)
                     if st.button(t("btn_create_model", lang)):
@@ -562,7 +576,7 @@ elif page == t("nav_ml", lang):
             if is_supervised and st.session_state.best_model is not None:
                 st.subheader(t("heading_tuning", lang))
 
-                if task == "classification":
+                if _TASK_MAP.get(task) == "classification":
                     optimize_options = ["Accuracy", "AUC", "Recall", "Precision", "F1", "Kappa", "MCC"]
                 else:
                     optimize_options = ["MAE", "MSE", "RMSE", "R2", "RMSLE", "MAPE"]
@@ -711,13 +725,13 @@ elif page == t("nav_results", lang):
         task = st.session_state.pycaret_task
         mod = get_module(task)
         use_model = st.session_state.tuned_model or st.session_state.best_model
-        is_supervised = task in ["classification", "regression"]
+        is_supervised = _TASK_MAP.get(task) in ["classification", "regression"]
 
         # --- PyCaret built-in plots ---
         st.subheader(t("heading_pycaret_viz", lang))
 
         if is_supervised:
-            if task == "classification":
+            if _TASK_MAP.get(task) == "classification":
                 plot_options = {
                     t("plot_auc", lang): "auc",
                     t("plot_confusion_matrix", lang): "confusion_matrix",
@@ -736,7 +750,7 @@ elif page == t("nav_results", lang):
                     "Cook's Distance": "cooks",
                 }
         else:
-            if task == "clustering":
+            if _TASK_MAP.get(task) == "clustering":
                 plot_options = {
                     t("plot_cluster_distribution", lang): "cluster",
                     t("plot_elbow", lang): "elbow",
@@ -754,131 +768,21 @@ elif page == t("nav_results", lang):
         if st.button(t("btn_generate_plot", lang)):
             with st.spinner(t("msg_plot_generating", lang)):
                 try:
-                    import glob as _glob
-                    plot_key = plot_options[selected_plot]
-                    displayed = False
-
-                    def _call_plot_model(save=False, suppress_show=False):
-                        """Call mod.plot_model with appropriate args."""
-                        _restore = None
-                        if suppress_show:
-                            _restore = plt.show
-                            plt.show = lambda *a, **k: None
-                        try:
-                            kwargs = {"plot": plot_key}
-                            if save:
-                                kwargs["save"] = True
-                            if st.session_state.pycaret_task not in ["clustering", "anomaly"]:
-                                kwargs["verbose"] = False
-                            return mod.plot_model(use_model, **kwargs)
-                        finally:
-                            if _restore:
-                                plt.show = _restore
-
-                    def _is_plotly_fig(obj):
-                        """Check if obj is a plotly Figure."""
-                        try:
-                            import plotly.graph_objects as go
-                            return isinstance(obj, go.Figure)
-                        except ImportError:
-                            return False
-
-                    # --- Strategy A: save=True ---
-                    try:
-                        _before = set(_glob.glob("*.png")) | set(_glob.glob("*.html"))
-                        ret = _call_plot_model(save=True)
-
-                        # A1) Plotly figure returned
-                        if not displayed and _is_plotly_fig(ret):
-                            st.plotly_chart(ret, use_container_width=True)
-                            displayed = True
-
-                        # A2) File path returned
-                        if not displayed and isinstance(ret, str):
-                            for candidate in [ret, os.path.basename(ret)]:
-                                if os.path.exists(candidate):
-                                    if candidate.endswith(".html"):
-                                        import plotly.io as pio
-                                        pfig = pio.read_html(candidate)
-                                        st.plotly_chart(pfig, use_container_width=True)
-                                    else:
-                                        st.image(candidate, use_container_width=True)
-                                    displayed = True
-                                    break
-
-                        # A3) Matplotlib figure returned
-                        if not displayed and ret is not None and not isinstance(ret, str) and hasattr(ret, "savefig"):
-                            buf = io.BytesIO()
-                            ret.savefig(buf, format="png", bbox_inches="tight", dpi=120)
-                            buf.seek(0)
-                            st.image(buf.getvalue(), use_container_width=True)
-                            plt.close(ret)
-                            displayed = True
-
-                        # A4) New files created
-                        if not displayed:
-                            _after = set(_glob.glob("*.png")) | set(_glob.glob("*.html"))
-                            _new_files = _after - _before
-                            if _new_files:
-                                newest = max(_new_files, key=os.path.getmtime)
-                                if newest.endswith(".html"):
-                                    with open(newest, "r", encoding="utf-8") as f:
-                                        st.components.v1.html(f.read(), height=600, scrolling=True)
-                                else:
-                                    st.image(newest, use_container_width=True)
-                                displayed = True
-
-                    except Exception:
-                        pass
-
-                    # --- Strategy B: no save, suppress plt.show, capture ---
-                    if not displayed:
-                        try:
-                            plt.close("all")
-                            ret = _call_plot_model(save=False, suppress_show=True)
-
-                            # B1) Plotly figure
-                            if _is_plotly_fig(ret):
-                                st.plotly_chart(ret, use_container_width=True)
-                                displayed = True
-
-                            # B2) Matplotlib figures
-                            if not displayed:
-                                fig_nums = plt.get_fignums()
-                                if fig_nums:
-                                    for fn in fig_nums:
-                                        fig = plt.figure(fn)
-                                        if fig.get_axes():
-                                            buf = io.BytesIO()
-                                            fig.savefig(buf, format="png", bbox_inches="tight", dpi=120)
-                                            buf.seek(0)
-                                            st.image(buf.getvalue(), use_container_width=True)
-                                            displayed = True
-                                    plt.close("all")
-                        except Exception:
-                            pass
-
-                    # --- Strategy C: st.pyplot / st.plotly_chart fallback ---
-                    if not displayed:
-                        try:
-                            plt.close("all")
-                            ret = _call_plot_model(save=False, suppress_show=True)
-                            if _is_plotly_fig(ret):
-                                st.plotly_chart(ret, use_container_width=True)
-                                displayed = True
-                            else:
-                                fig_nums = plt.get_fignums()
-                                if fig_nums:
-                                    for fn in fig_nums:
-                                        st.pyplot(plt.figure(fn))
-                                    plt.close("all")
-                                    displayed = True
-                        except Exception:
-                            pass
-
-                    if not displayed:
-                        st.info(t("msg_plot_not_found", lang))
-
+                    fig_path = mod.plot_model(use_model, plot=plot_options[selected_plot], save=True, verbose=False)
+                    # PyCaret saves plot as .png in current directory
+                    if isinstance(fig_path, str) and os.path.exists(fig_path):
+                        st.image(fig_path)
+                    else:
+                        # Fallback: look for recently created png files
+                        png_files = sorted(
+                            [f for f in os.listdir(".") if f.endswith(".png")],
+                            key=os.path.getmtime,
+                            reverse=True,
+                        )
+                        if png_files:
+                            st.image(png_files[0])
+                        else:
+                            st.info(t("msg_plot_not_found", lang))
                 except Exception as e:
                     st.error(t("msg_plot_error", lang).format(e=e))
 
@@ -897,64 +801,54 @@ elif page == t("nav_results", lang):
             st.subheader(t("heading_shap", lang))
             st.markdown(t("msg_shap_desc", lang))
 
-            shap_type = st.selectbox(
-                t("label_shap_plot_type", lang),
-                [
-                    "Summary Plot (Bar)",
-                    "Summary Plot (Dot)",
-                    "Waterfall Plot",
-                    "Beeswarm Plot",
-                    "Bar Plot (shap.plots.bar)",
-                    "Scatter Plot",
-                    "Dependence Plot",
-                    "Force Plot",
-                    "Decision Plot",
-                    "Violin Plot",
-                    "Heatmap Plot",
-                ],
-            )
+            # ---------------------------------------------------------------
+            # Step 1: SHAP値の一括計算（キャッシュ）
+            # auto-sklearn-app.py と同方式:
+            #   一度計算したら session_state に保存し、プロット切替で再計算しない
+            # ---------------------------------------------------------------
+            shap_cached = st.session_state.shap_cached_explanation is not None
 
-            # Waterfall / Force need a sample index
-            shap_sample_idx = None
-            if shap_type in ["Waterfall Plot", "Scatter Plot", "Force Plot"]:
-                max_idx = min(499, st.session_state.df.shape[0] - 1)
-                label_map = {
-                    "Waterfall Plot": t("label_sample_index", lang),
-                    "Force Plot": t("label_sample_index_all", lang),
-                    "Scatter Plot": t("label_scatter_feature_idx", lang),
-                }
-                shap_sample_idx = st.number_input(
-                    label_map.get(shap_type, t("label_index", lang)),
-                    min_value=-1 if shap_type == "Force Plot" else 0,
-                    max_value=max_idx,
-                    value=0,
-                    step=1,
+            with st.expander("⚙️ SHAP計算設定" if lang == "ja" else "⚙️ SHAP Compute Settings",
+                             expanded=not shap_cached):
+                # スライダーの最大値をPyCaretのX_train実サイズから取得
+                # （df.shape[0] はtrain/test split前の全行数なので使わない）
+                try:
+                    _x_train_size = mod.get_config("X_train").shape[0]
+                except Exception:
+                    _x_train_size = st.session_state.df.shape[0] if st.session_state.df is not None else 500
+                max_shap_samples = st.slider(
+                    "SHAPサンプル数（訓練データ実数 = TreeExplainer推奨）" if lang == "ja"
+                    else "SHAP sample count (actual train size shown, TreeExplainer recommended for all)",
+                    min_value=50,
+                    max_value=_x_train_size,
+                    value=min(_x_train_size, 500),
+                    step=50,
+                    help=f"訓練データ実数: {_x_train_size}行。TreeExplainerなら全件でも高速。KernelExplainerは200以下推奨。"
+                         if lang == "ja" else
+                         f"Actual X_train rows: {_x_train_size}. TreeExplainer handles all rows fast. Keep ≤200 for KernelExplainer.",
                 )
 
-            # Scatter: choose feature
-            scatter_feature = None
-            if shap_type == "Scatter Plot":
-                if st.session_state.df is not None:
-                    scatter_feature = st.selectbox(
-                        t("label_scatter_feature", lang),
-                        [t("label_auto", lang)] + st.session_state.df.columns.tolist(),
-                        key="shap_scatter_feat",
+                col_shap_calc1, col_shap_calc2 = st.columns([1, 1])
+                with col_shap_calc1:
+                    compute_shap = st.button(
+                        "🔄 SHAP値を計算（一括）" if lang == "ja" else "🔄 Compute SHAP values (bulk)",
+                        type="primary",
                     )
+                with col_shap_calc2:
+                    if st.button("🗑️ SHAPキャッシュをリセット" if lang == "ja" else "🗑️ Reset SHAP cache"):
+                        st.session_state.shap_cached_explanation = None
+                        st.session_state.shap_cached_sv_array = None
+                        st.session_state.shap_cached_feature_names = None
+                        st.session_state.shap_cached_n_samples = None
+                        st.session_state.shap_results = []
+                        st.rerun()
 
-            col_shap_btn1, col_shap_btn2 = st.columns([1, 1])
-            with col_shap_btn1:
-                run_shap = st.button(t("btn_run_shap", lang))
-            with col_shap_btn2:
-                if st.button(t("btn_clear_shap", lang)):
-                    st.session_state.shap_results = []
-                    st.experimental_rerun() if hasattr(st, "experimental_rerun") else st.rerun()
-
-            if run_shap:
-                with st.spinner(t("msg_shap_computing", lang)):
+            if compute_shap:
+                with st.spinner("SHAP値を一括計算中..." if lang == "ja" else "Computing SHAP values (bulk)..."):
                     try:
                         import shap
 
-                        # Get transformed data from PyCaret pipeline
+                        # PyCaret pipeline からデータ取得
                         pipeline = mod.get_config("pipeline")
                         X_train = mod.get_config("X_train")
                         y_train = mod.get_config("y_train")
@@ -964,7 +858,7 @@ elif page == t("nav_results", lang):
                         else:
                             X_transformed = X_train
 
-                        # Unwrap model -- get the fitted estimator
+                        # モデルのアンラップ
                         final_model = use_model
                         if hasattr(use_model, "steps"):
                             final_model = use_model.steps[-1][1]
@@ -977,8 +871,7 @@ elif page == t("nav_results", lang):
                         except Exception:
                             final_model = use_model
 
-                        # Limit samples
-                        max_shap_samples = 500
+                        # サンプル切り出し（スライダー値を使用）
                         if isinstance(X_transformed, pd.DataFrame):
                             X_shap = X_transformed.iloc[:max_shap_samples]
                         else:
@@ -986,14 +879,22 @@ elif page == t("nav_results", lang):
 
                         feature_names = list(X_shap.columns) if isinstance(X_shap, pd.DataFrame) else None
 
-                        # --- Compute SHAP values ---
+                        # --- SHAP値計算（TreeExplainer → Kernel → Permutation の優先順）---
                         shap_explanation = None
                         sv_array = None
+                        explainer_name = ""
 
-                        # 1) TreeExplainer
+                        # 1) TreeExplainer（高速・全データ対応）
                         try:
+                            _t0 = time.time()
+                            progress_bar = st.progress(0)
+                            status_text = st.empty()
+                            status_text.text("TreeExplainer で計算中..." if lang == "ja" else "Computing with TreeExplainer...")
                             exp = shap.TreeExplainer(final_model)
                             raw = exp.shap_values(X_shap)
+                            _t1 = time.time()
+                            progress_bar.progress(1.0)
+                            status_text.empty()
                             base = exp.expected_value
                             if isinstance(raw, list):
                                 sv_arr = raw[1] if len(raw) == 2 else raw[0]
@@ -1010,24 +911,43 @@ elif page == t("nav_results", lang):
                                 feature_names=feature_names,
                             )
                             sv_array = np.array(sv_arr)
+                            explainer_name = f"TreeExplainer ({_t1-_t0:.1f}s, {len(X_shap)}サンプル)"
                         except Exception:
                             pass
 
-                        # 2) KernelExplainer
+                        # 2) KernelExplainer（バッチ処理）
                         if shap_explanation is None:
                             predict_fn = getattr(final_model, "predict_proba", None) or getattr(final_model, "predict", None)
                             if predict_fn is not None:
                                 try:
-                                    bg = shap.sample(X_shap, min(50, len(X_shap)))
+                                    bg = shap.sample(X_shap, min(100, len(X_shap)))
                                     exp = shap.KernelExplainer(predict_fn, bg)
-                                    raw = exp.shap_values(X_shap)
+                                    # バッチ処理でプログレスバー表示
+                                    batch_size = 50
+                                    n_s = len(X_shap)  # = max_shap_samples以下（X_train実数に依存）
+                                    n_batches = max(1, (n_s + batch_size - 1) // batch_size)
+                                    progress_bar = st.progress(0)
+                                    status_text = st.empty()
+                                    all_raw = []
+                                    for _i in range(n_batches):
+                                        _s = _i * batch_size
+                                        _e = min(_s + batch_size, n_s)
+                                        batch = X_shap.iloc[_s:_e] if isinstance(X_shap, pd.DataFrame) else X_shap[_s:_e]
+                                        status_text.text(
+                                            f"KernelExplainer: {_e} / {n_s} サンプル処理中"
+                                            if lang == "ja" else
+                                            f"KernelExplainer: {_e} / {n_s} samples"
+                                        )
+                                        batch_raw = exp.shap_values(batch)
+                                        if isinstance(batch_raw, list):
+                                            batch_raw = batch_raw[1] if len(batch_raw) == 2 else batch_raw[0]
+                                        all_raw.append(np.array(batch_raw))
+                                        progress_bar.progress((_i + 1) / n_batches)
+                                    status_text.empty()
+                                    raw = np.concatenate(all_raw, axis=0)
                                     base = exp.expected_value
-                                    if isinstance(raw, list):
-                                        sv_arr = raw[1] if len(raw) == 2 else raw[0]
-                                        bv = base[1] if isinstance(base, (list, np.ndarray)) and len(base) > 1 else base
-                                    else:
-                                        sv_arr = raw
-                                        bv = base
+                                    sv_arr = raw
+                                    bv = base[1] if isinstance(base, (list, np.ndarray)) and len(base) > 1 else base
                                     if hasattr(bv, "__len__") and not isinstance(bv, (float, int, np.floating)):
                                         bv = float(bv[0]) if len(bv) == 1 else float(np.mean(bv))
                                     shap_explanation = shap.Explanation(
@@ -1037,6 +957,7 @@ elif page == t("nav_results", lang):
                                         feature_names=feature_names,
                                     )
                                     sv_array = np.array(sv_arr)
+                                    explainer_name = f"KernelExplainer ({n_s}サンプル)"
                                 except Exception:
                                     pass
 
@@ -1058,8 +979,9 @@ elif page == t("nav_results", lang):
                                 feature_names=feature_names,
                             )
                             sv_array = np.array(sv_arr)
+                            explainer_name = f"PermutationExplainer ({len(X_shap)}サンプル)"
 
-                        # If 3D, reduce
+                        # 3D配列の削減
                         if sv_array is not None and sv_array.ndim == 3:
                             sv_array = sv_array[:, :, 1] if sv_array.shape[2] == 2 else sv_array[:, :, 0]
                             shap_explanation = shap.Explanation(
@@ -1069,7 +991,106 @@ elif page == t("nav_results", lang):
                                 feature_names=feature_names,
                             )
 
-                        # --- Generate plot & save to session_state ---
+                        # キャッシュに保存
+                        st.session_state.shap_cached_explanation = shap_explanation
+                        st.session_state.shap_cached_sv_array = sv_array
+                        st.session_state.shap_cached_feature_names = feature_names
+                        st.session_state.shap_cached_n_samples = len(X_shap)
+                        shap_cached = True
+
+                        st.success(
+                            f"✅ SHAP値を計算・キャッシュしました（{explainer_name}）"
+                            if lang == "ja" else
+                            f"✅ SHAP values cached ({explainer_name})"
+                        )
+
+                    except Exception as e:
+                        st.error(t("msg_shap_error", lang).format(e=e))
+                        import traceback
+                        st.code(traceback.format_exc())
+
+            # ---------------------------------------------------------------
+            # Step 2: キャッシュ済みSHAP値を使ってプロット生成
+            #   プロット切替・インデックス変更で再計算不要
+            # ---------------------------------------------------------------
+            if st.session_state.shap_cached_explanation is not None:
+                shap_explanation = st.session_state.shap_cached_explanation
+                sv_array = st.session_state.shap_cached_sv_array
+                feature_names = st.session_state.shap_cached_feature_names
+                _n_cached = st.session_state.shap_cached_n_samples
+
+                st.info(
+                    f"📊 キャッシュ済み SHAP値: {_n_cached} サンプル × "
+                    f"{sv_array.shape[1] if sv_array is not None else '?'} 特徴量"
+                    if lang == "ja" else
+                    f"📊 Cached SHAP values: {_n_cached} samples × "
+                    f"{sv_array.shape[1] if sv_array is not None else '?'} features"
+                )
+
+                st.markdown("---")
+
+                shap_type = st.selectbox(
+                    t("label_shap_plot_type", lang),
+                    [
+                        "Summary Plot (Bar)",
+                        "Summary Plot (Dot)",
+                        "Waterfall Plot",
+                        "Beeswarm Plot",
+                        "Bar Plot (shap.plots.bar)",
+                        "Scatter Plot",
+                        "Dependence Plot",
+                        "Force Plot",
+                        "Decision Plot",
+                        "Violin Plot",
+                        "Heatmap Plot",
+                    ],
+                )
+
+                # Waterfall / Force: サンプルインデックス
+                shap_sample_idx = None
+                if shap_type in ["Waterfall Plot", "Force Plot"]:
+                    max_idx = _n_cached - 1
+                    label_map = {
+                        "Waterfall Plot": t("label_sample_index", lang),
+                        "Force Plot": t("label_sample_index_all", lang),
+                    }
+                    shap_sample_idx = st.number_input(
+                        label_map.get(shap_type, t("label_index", lang)),
+                        min_value=-1 if shap_type == "Force Plot" else 0,
+                        max_value=max_idx,
+                        value=0,
+                        step=1,
+                    )
+
+                # Scatter: 特徴量選択（全特徴量を選択肢に表示）
+                scatter_feature = None
+                if shap_type == "Scatter Plot":
+                    feat_opts = [t("label_auto", lang)] + (feature_names if feature_names else [])
+                    scatter_feature = st.selectbox(
+                        t("label_scatter_feature", lang),
+                        feat_opts,
+                        key="shap_scatter_feat",
+                    )
+
+                col_shap_btn1, col_shap_btn2 = st.columns([1, 1])
+                with col_shap_btn1:
+                    run_shap = st.button(t("btn_run_shap", lang))
+                with col_shap_btn2:
+                    if st.button(t("btn_clear_shap", lang)):
+                        st.session_state.shap_results = []
+                        st.rerun()
+
+                if run_shap:
+                    try:
+                        import shap
+
+                        # X_shapをキャッシュから再構築
+                        _data = shap_explanation.data
+                        if feature_names is not None:
+                            X_shap = pd.DataFrame(_data, columns=feature_names)
+                        else:
+                            X_shap = _data
+
                         plt.close("all")
                         result_entry = {"type": shap_type, "fig_bytes": None, "html": None, "params": {}}
 
@@ -1099,6 +1120,7 @@ elif page == t("nav_results", lang):
                             result_entry["fig_bytes"] = _fig_to_bytes()
 
                         elif shap_type == "Scatter Plot":
+                            # 全キャッシュサンプルを使用（制限なし）
                             if scatter_feature and scatter_feature != t("label_auto", lang) and feature_names and scatter_feature in feature_names:
                                 feat_idx = feature_names.index(scatter_feature)
                             else:
@@ -1107,6 +1129,7 @@ elif page == t("nav_results", lang):
                             shap.plots.scatter(shap_explanation[:, feat_idx], show=False)
                             result_entry["fig_bytes"] = _fig_to_bytes()
                             result_entry["params"]["feature"] = feature_names[feat_idx] if feature_names else feat_idx
+                            result_entry["params"]["n_points"] = _n_cached
 
                         elif shap_type == "Dependence Plot":
                             if isinstance(X_shap, pd.DataFrame):
@@ -1155,7 +1178,6 @@ elif page == t("nav_results", lang):
 
                         plt.close("all")
 
-                        # Append to session history
                         st.session_state.shap_results.append(result_entry)
                         st.success(t("msg_shap_complete", lang).format(type=shap_type))
 
@@ -1164,7 +1186,14 @@ elif page == t("nav_results", lang):
                         import traceback
                         st.code(traceback.format_exc())
 
-            # --- Display all cached SHAP results ---
+            else:
+                st.info(
+                    "👆 「SHAP値を計算（一括）」ボタンを押すと、全プロットで共有できるSHAP値を計算します。"
+                    if lang == "ja" else
+                    "👆 Press 'Compute SHAP values (bulk)' to calculate SHAP values shared across all plot types."
+                )
+
+            # --- SHAP履歴の表示 ---
             if st.session_state.shap_results:
                 st.markdown("---")
                 st.markdown(f"#### {t('heading_shap_history', lang)}")
@@ -1248,7 +1277,7 @@ elif page == t("nav_results", lang):
                             feature_names_lime = [f"feature_{i}" for i in range(X_transformed.shape[1])]
                             X_np = np.array(X_transformed)
 
-                        is_classification = task == "classification"
+                        is_classification = _TASK_MAP.get(task) == "classification"
 
                         if is_classification:
                             y_vals = y_train.unique() if hasattr(y_train, "unique") else np.unique(y_train)
@@ -1399,7 +1428,7 @@ elif page == t("nav_predict", lang):
         task = st.session_state.pycaret_task
         mod = get_module(task) if task else None
         use_model = st.session_state.tuned_model or st.session_state.best_model or st.session_state.loaded_model
-        is_supervised = task in ["classification", "regression"] if task else True
+        is_supervised = _TASK_MAP.get(task) in ["classification", "regression"] if task else True
 
         # Show which model is being used
         if st.session_state.loaded_model is not None and st.session_state.loaded_model_name:
@@ -1488,8 +1517,12 @@ elif page == t("nav_load_model", lang):
     # --- Task selection (needed to use the model with PyCaret) ---
     load_task = st.selectbox(
         t("label_task_type", lang),
-        ["classification", "regression", "clustering", "anomaly"],
-        format_func=lambda k: t(_TASK_LABELS[k], lang),
+        [
+            t("opt_classification", lang),
+            t("opt_regression", lang),
+            t("opt_clustering", lang),
+            t("opt_anomaly", lang),
+        ],
         key="load_task_select",
     )
 
