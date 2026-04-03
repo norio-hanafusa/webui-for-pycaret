@@ -276,6 +276,27 @@ PyCaret の組み込みプロット機能を使用します。タスクの種類
 
 教師あり学習のモデルに対して、SHAP (SHapley Additive exPlanations) による特徴量の貢献度解析を実行します。
 
+**Step 1: SHAP 値の一括計算（キャッシュ方式）**
+
+SHAP 値は一括で計算し、セッションステートにキャッシュします。一度計算すれば、プロットの種類を切り替えても再計算は不要です。
+
+- **サンプル数スライダー**: SHAP 計算に使用するサンプル数を 50 から訓練データ実数（X_train のサイズ）まで選択できます。
+  - TreeExplainer: 全件でも高速に計算可能
+  - KernelExplainer: 200 以下を推奨（バッチ処理でプログレスバー表示）
+- **「SHAP 値を計算（一括）」ボタン**: SHAP 値を一括計算してキャッシュに保存します。
+- **「SHAP キャッシュをリセット」ボタン**: キャッシュをクリアして再計算可能にします（サンプル数変更時などに使用）。
+
+**SHAP 値の計算順序（Explainer 優先順位）:**
+1. TreeExplainer（ツリーベースモデル向け、高速、全データ対応）
+2. KernelExplainer（モデルに依存しない汎用手法、バッチ処理でプログレスバー表示）
+3. PermutationExplainer（最後の手段として使用）
+
+計算完了後、使用した Explainer 名・計算時間・サンプル数が表示されます。
+
+**Step 2: キャッシュ済み SHAP 値を使ったプロット生成**
+
+キャッシュされた SHAP 値を使用して、以下の 11 種類のプロットを生成します。プロットの切り替えやパラメータ変更のたびに SHAP 値を再計算する必要はありません。
+
 **利用可能なプロットタイプ（全 11 種類）:**
 
 | プロット | 説明 |
@@ -294,16 +315,10 @@ PyCaret の組み込みプロット機能を使用します。タスクの種類
 
 **パラメータ:**
 - Waterfall Plot, Force Plot: 対象サンプルのインデックスを指定（Force Plot は -1 で全体表示）
-- Scatter Plot: 注目する特徴量を指定（空欄の場合は最重要特徴量を自動選択）
+- Scatter Plot: 注目する特徴量を選択（キャッシュ済み特徴量の一覧から選択可能。自動選択も可）
 
-**SHAP 値の計算:**
-SHAP 値の計算は以下の順序で試行されます。
-1. TreeExplainer（ツリーベースモデル向け、高速）
-2. KernelExplainer（モデルに依存しない汎用手法）
-3. PermutationExplainer（最後の手段として使用）
-
-**キャッシュ機能:**
-SHAP の解析結果はセッションステートにキャッシュされます。複数回の解析結果が履歴として保持され、タブを切り替えても結果が消えません。「SHAP 履歴をクリア」ボタンで全履歴を削除できます。
+**プロット履歴:**
+生成したプロットはセッションステートに履歴として保持され、タブを切り替えても結果が消えません。「SHAP 履歴をクリア」ボタンでプロット履歴を削除できます（SHAP 値のキャッシュは保持されます）。
 
 #### 4.4.3 LIME 解析
 
@@ -474,7 +489,8 @@ LIME の解析結果も SHAP と同様にセッションステートにキャッ
 
 - 一部のモデル（特にアンサンブルモデルやカスタムモデル）では SHAP 値の計算に失敗することがあります。
 - TreeExplainer が使用できないモデルの場合、KernelExplainer や PermutationExplainer が自動的に試行されますが、計算時間が大幅に増加する場合があります。
-- サンプル数は最大 500 に制限されています。
+- サンプル数はスライダーで調整可能です（50 から X_train 実数まで）。KernelExplainer 使用時はサンプル数を 200 以下に設定することを推奨します。
+- 「SHAP キャッシュをリセット」ボタンでキャッシュをクリアしてから、サンプル数やモデルを変更して再計算してください。
 
 ### LIME 解析でエラーが発生する
 
@@ -817,6 +833,27 @@ Uses PyCaret built-in plotting functions. Available plots depend on the task typ
 
 Performs SHAP (SHapley Additive exPlanations) feature contribution analysis for supervised learning models.
 
+**Step 1: Bulk SHAP Computation (Cached)**
+
+SHAP values are computed once in bulk and cached in session state. Once computed, switching between plot types does not require recomputation.
+
+- **Sample count slider**: Select the number of samples for SHAP computation from 50 up to the actual X_train size.
+  - TreeExplainer: Handles full datasets efficiently
+  - KernelExplainer: 200 or fewer samples recommended (batch processing with progress bar)
+- **"Compute SHAP values (bulk)" button**: Computes SHAP values and stores them in cache.
+- **"Reset SHAP cache" button**: Clears the cache to allow recomputation (e.g., after changing sample count).
+
+**Explainer priority order:**
+1. TreeExplainer (for tree-based models, fast, supports full data)
+2. KernelExplainer (model-agnostic, batch processing with progress bar)
+3. PermutationExplainer (used as a last resort)
+
+After computation, the explainer name, computation time, and sample count are displayed.
+
+**Step 2: Plot Generation from Cached SHAP Values**
+
+Generate plots from cached SHAP values. No recomputation is needed when switching plot types or changing parameters.
+
 **Available plot types (all 11):**
 
 | Plot | Description |
@@ -835,16 +872,10 @@ Performs SHAP (SHapley Additive exPlanations) feature contribution analysis for 
 
 **Parameters:**
 - Waterfall Plot, Force Plot: Specify the target sample index (Force Plot uses -1 for all samples)
-- Scatter Plot: Specify the feature of interest (empty = most important feature is auto-selected)
+- Scatter Plot: Select the feature of interest from cached feature list (auto-selection also available)
 
-**SHAP value computation:**
-SHAP values are computed using the following methods in order:
-1. TreeExplainer (for tree-based models, fast)
-2. KernelExplainer (model-agnostic, general purpose)
-3. PermutationExplainer (used as a last resort)
-
-**Caching:**
-SHAP analysis results are cached in session state. Multiple analysis results are retained as a history and persist across tab switches. Click "Clear SHAP History" to delete all history.
+**Plot history:**
+Generated plots are retained as a history in session state and persist across tab switches. Click "Clear SHAP History" to delete plot history (SHAP value cache is preserved).
 
 #### 4.4.3 LIME Analysis
 
@@ -1015,7 +1046,8 @@ Switch between Japanese (ja) and English (en) using the language selector in the
 
 - Some models (especially ensemble or custom models) may fail SHAP value computation.
 - When TreeExplainer cannot be used, KernelExplainer and PermutationExplainer are automatically tried, but computation time may increase significantly.
-- The sample count is limited to a maximum of 500.
+- The sample count is adjustable via the slider (50 to actual X_train size). When using KernelExplainer, setting the sample count to 200 or fewer is recommended.
+- Use the "Reset SHAP cache" button to clear the cache, then adjust the sample count or model and recompute.
 
 ### LIME analysis errors
 

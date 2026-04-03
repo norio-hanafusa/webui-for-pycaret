@@ -10,7 +10,7 @@ No-code machine learning platform built on [PyCaret](https://pycaret.org/) with 
 - **Machine Learning** -- Classification, Regression, Clustering, Anomaly Detection
 - **Model Comparison** -- Compare multiple algorithms with per-model progress tracking
 - **Hyperparameter Tuning** -- Baseline vs tuned comparison table with multiple search libraries (scikit-learn, Optuna, scikit-optimize)
-- **SHAP Analysis** -- 11 plot types: Summary Bar, Summary Dot, Waterfall, Beeswarm, Bar, Scatter, Dependence, Force, Decision, Violin, Heatmap
+- **SHAP Analysis** -- Bulk SHAP computation with caching, configurable sample count slider, 11 plot types: Summary Bar, Summary Dot, Waterfall, Beeswarm, Bar, Scatter, Dependence, Force, Decision, Violin, Heatmap
 - **LIME Analysis** -- Local feature contribution visualization with interpretability metrics
 - **Prediction** -- Predict on new data using trained or loaded models
 - **Model Management** -- Save, load, rename, delete, download models (pickle / PyCaret format)
@@ -82,14 +82,30 @@ webui-for-pycaret/
 | Data Loading | Upload CSV / Excel files, preview data, view statistics and types |
 | Data View / Edit | Edit cells, drop columns, fill missing values |
 | Machine Learning | Setup preprocessing, compare models, tune hyperparameters, predict |
-| Results / Visualization | PyCaret plots, SHAP analysis (11 types), LIME analysis |
+| Results / Visualization | PyCaret plots, SHAP analysis (bulk compute + cache, 11 plot types), LIME analysis |
 | New Data Prediction | Upload new data and predict using trained models |
 | Load Model | Load pickle / PyCaret models from upload or server |
 | Save / Export | Export data and predictions (CSV / Excel), save and manage models |
 
 ---
 
-## SHAP Plot Types
+## SHAP Analysis
+
+### Bulk Computation & Caching
+
+SHAP values are computed once in bulk and cached in session state. Switching between plot types does not trigger recomputation, enabling fast interactive exploration.
+
+- **Sample count slider** -- Select the number of samples for SHAP computation (50 to actual X_train size). TreeExplainer handles full datasets efficiently; KernelExplainer is recommended with 200 or fewer samples.
+- **Progress indicator** -- Real-time progress bar during computation (batch processing for KernelExplainer).
+- **Cache reset** -- One-click button to clear cached SHAP values and recompute.
+
+### Explainer Priority
+
+1. **TreeExplainer** -- Fast, supports full data for tree-based models
+2. **KernelExplainer** -- Model-agnostic, batch processing with progress bar
+3. **PermutationExplainer** -- Fallback for unsupported models
+
+### Plot Types (11 types)
 
 | Plot | Description |
 |---|---|
