@@ -911,7 +911,9 @@ elif page == t("nav_results", lang):
                                 feature_names=feature_names,
                             )
                             sv_array = np.array(sv_arr)
-                            explainer_name = f"TreeExplainer ({_t1-_t0:.1f}s, {len(X_shap)}サンプル)"
+                            explainer_name = (f"TreeExplainer ({_t1-_t0:.1f}s, {len(X_shap)}サンプル)"
+                                               if lang == "ja" else
+                                               f"TreeExplainer ({_t1-_t0:.1f}s, {len(X_shap)} samples)")
                         except Exception:
                             pass
 
@@ -957,7 +959,9 @@ elif page == t("nav_results", lang):
                                         feature_names=feature_names,
                                     )
                                     sv_array = np.array(sv_arr)
-                                    explainer_name = f"KernelExplainer ({n_s}サンプル)"
+                                    explainer_name = (f"KernelExplainer ({n_s}サンプル)"
+                                                       if lang == "ja" else
+                                                       f"KernelExplainer ({n_s} samples)")
                                 except Exception:
                                     pass
 
@@ -979,7 +983,9 @@ elif page == t("nav_results", lang):
                                 feature_names=feature_names,
                             )
                             sv_array = np.array(sv_arr)
-                            explainer_name = f"PermutationExplainer ({len(X_shap)}サンプル)"
+                            explainer_name = (f"PermutationExplainer ({len(X_shap)}サンプル)"
+                                               if lang == "ja" else
+                                               f"PermutationExplainer ({len(X_shap)} samples)")
 
                         # 3D配列の削減
                         if sv_array is not None and sv_array.ndim == 3:
